@@ -11,7 +11,7 @@ import datetime
 DB_URL_RAW = os.getenv("DB_URL")
 
 if not DB_URL_RAW:
-    # Koneksi Lokal (Pastikan encoding %40 untuk @)
+    # Koneksi Lokal
     SQLALCHEMY_DATABASE_URL = "mysql+pymysql://ironnur:Project%4025@127.0.0.1:3306/iuris_legal_db"
     # Create engine standar untuk lokal
     engine = create_engine(SQLALCHEMY_DATABASE_URL)
@@ -32,7 +32,6 @@ else:
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- 2. MODEL DATABASE (Menggunakan Base yang sudah didefinisikan di atas) ---
 # --- 2. MODEL DATABASE ---
 class LegalCase(Base):
     __tablename__ = "legal_cases"
