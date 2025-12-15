@@ -3,26 +3,30 @@ from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.engine import make_url # Tambahan untuk validasi URL
 from pydantic import BaseModel
 from typing import List, Optional
 import datetime
 
 # --- 1. KONFIGURASI DATABASE ---
 DB_URL_RAW = os.getenv("DB_URL")
+
 if not DB_URL_RAW:
-    # Koneksi Lokal
-    # SQLALCHEMY_DATABASE_URL = "mysql+pymysql://ironnur:Project@25@127.0.0.1:3306/iuris_legal_db"
-    # Karakter '@' di password 'Project@25' diganti menjadi '%40'
+    # Koneksi Lokal (Pastikan encoding %40 untuk @)
     SQLALCHEMY_DATABASE_URL = "mysql+pymysql://ironnur:Project%4025@127.0.0.1:3306/iuris_legal_db"
 else:
-    # Koneksi Cloud (Aiven)
-    SQLALCHEMY_DATABASE_URL = DB_URL_RAW.replace("mysql://", "mysql+pymysql://")
+    # Bersihkan URL dari Render/Aiven
+    if DB_URL_RAW.startswith("mysql://"):
+        SQLALCHEMY_DATABASE_URL = DB_URL_RAW.replace("mysql://", "mysql+pymysql://", 1)
+    else:
+        SQLALCHEMY_DATABASE_URL = DB_URL_RAW
 
+# Membuat Engine, Session, dan Base secara berurutan
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- 2. MODEL DATABASE (SQLAlchemy) ---
+# --- 2. MODEL DATABASE (Menggunakan Base yang sudah didefinisikan di atas) ---
 class LegalCase(Base):
     __tablename__ = "legal_cases"
     id = Column(Integer, primary_key=True, index=True)
@@ -33,8 +37,7 @@ class LegalCase(Base):
     status = Column(String(50), default="open")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-# --- 3. SCHEMA VALIDASI (Pydantic) ---
-# Schema untuk menerima input data
+# --- 3. SCHEMA VALIDASI ---
 class CaseBase(BaseModel):
     client_id: int
     lawyer_id: Optional[int] = None
@@ -42,17 +45,16 @@ class CaseBase(BaseModel):
     case_description: Optional[str] = None
     status: Optional[str] = "open"
 
-# Schema untuk merespon data (termasuk ID)
 class CaseResponse(CaseBase):
     id: int
     class Config:
         from_attributes = True
 
-# --- 4. INIT FASTAPI & DEPENDENCY ---
+# --- 4. INIT FASTAPI & DEPENDENCY (Menggunakan SessionLocal) ---
 app = FastAPI(title="IURIS Legal Python API")
 
 def get_db():
-    db = SessionLocal()
+    db = SessionLocal() # VS Code sekarang tahu apa itu SessionLocal
     try:
         yield db
     finally:
